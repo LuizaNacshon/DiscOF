@@ -1,0 +1,112 @@
+'''
+Created on Apr 26, 2014
+
+@author: lucky Nacshon
+'''
+#made for the result
+
+import os
+import json
+import datetime
+import csv
+import time
+from collections import OrderedDict
+
+list_of_values = []
+
+
+def get_json(command):
+    try:
+       data  = os.popen(command).read()
+       res = json.loads(data)
+       return res
+    except Exception as err:
+       print "Error in Json "+str(err)
+       return {}
+
+def Compute_freeflowentries(RunID,serial,Algo,AggMethod):
+        print "Compute flow entries"
+        routers = ""
+        entries=""
+        entries2=""
+        #current bug for every installed entry we have one extra
+        #routing.NER_routerswithfpandcr = routing.NER_fp_routers
+        if(int(AggMethod)==1):
+            Meth='max-max'
+        elif(int(AggMethod)==2):
+            Meth='max-min'
+        elif(int(AggMethod)==3):
+            Meth='min-min'
+        if(int(Algo)==1):
+            Alg='NER'
+        elif(int(Algo)==2):
+            Alg='Greedy'
+        if(int(Algo)==1):
+            
+            with open(os.getcwd() + '/' +   "Greedy_NER/allrouters.txt") as fin:
+                lines = (line.rstrip() for line in fin)
+                unique_lines = OrderedDict.fromkeys( (line for line in lines if line) )
+        elif(int(Algo)==2):
+            
+            with open(os.getcwd() + '/' +   "Greedy_NER/allrouters.txt") as fin:
+                lines = (line.rstrip() for line in fin)
+                unique_lines = OrderedDict.fromkeys( (line for line in lines if line) )
+
+        ginicon=0
+        totalfreeentries=0
+        totalusedentries=0
+        all_routers_cr=0
+        try:
+            command = 'curl -s http://localhost:8080/wm/core/switch/all/table/json'
+            tables={}
+            while True:
+              if(len(tables)>0):
+                 break
+              tables  = get_json(command)
+              if(len(tables)==0):
+                 time.sleep(20)
+            totalfreeentries = 0
+            totalusedentries=0
+            all_routers_cr = {}
+            for i in unique_lines.keys():
+                routersinrouting = []
+                singlerouter = []
+                
+                for j in tables[i]:#read from the Json for each router
+                    if (int(j['tableId']) == 0):
+                        free_entries=((int(j['maximumEntries']))-((int(j['activeCount']))-9))
+
+                        usageentries= (int(j['activeCount']))-9
+                        totalfreeentries = totalfreeentries + free_entries
+                        totalusedentries = totalusedentries + usageentries
+                        singlerouter.append(i)
+                        routers=format(i) + "||" + routers
+                        singlerouter.append(free_entries)
+                        entries = format(free_entries) + "||" + entries
+                        list_of_values.append(free_entries)
+                all_routers_cr[i] = free_entries
+                routersinrouting.append(singlerouter)
+                now = datetime.datetime.now()
+                #print "Current Number of Free Flow-table Entries: "
+                
+            ginicon =  gini(list_of_values)
+            splitedrouters=routers.split('||')
+            splitedentries=entries.split('||')
+    
+            print entries 
+            return  (ginicon,totalfreeentries,totalusedentries,all_routers_cr)
+        except:
+            print "flow entries jason error"
+	    return  (-1,-1,-1,[])
+
+        
+def gini(list_of_values):
+  sorted_list = sorted(list_of_values)
+  height, area = 0, 0
+  for value in sorted_list:
+    height += value
+    area += height - value / 2.
+  fair_area = height * len(list_of_values) / 2
+  return (fair_area - area) / fair_area
+        
+#Compute_freeflowentries(1,1)

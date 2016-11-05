@@ -1,0 +1,215 @@
+'''
+Created on Jun 3, 2014
+
+@author: lucky Nacshon
+
+'''
+from collections import OrderedDict
+import csv,os,datetime,json
+total=[]
+linesarray = []
+greedyrouter = []
+Nerrouter = []
+
+
+
+def Add_totalGreedy(Algoruntime,runID,serial,Algo, Aggmethod,numlinks,giniValue,d_min,d_max,Nerrouter,numofners,\
+                    sumbeetweenece,totalfreeentries,totalusedentries,giniThreshold,\
+                        potentialginiValue,alpha,numberofremovedFp,numberofnewinstalled,delete_installed_Fp_runtime,\
+                         add_installed_Fp_runtime):
+    countermod = 0
+    counterin=0
+    counterrem=0
+    numberofflows=0
+    droppackets=0
+    cflowmod=0
+    cflowmodrouting=0
+    cpacketin=0
+    cpacketinrouting=0
+    cpacketout=0
+    cpacketoutrouting=0
+
+    command = 'curl -s http://localhost:8080/wm/core/memory/json'
+    data  = os.popen(command).read()
+    cmemory = json.loads(data)
+    memoryusage = cmemory['total'] - cmemory['free']
+    
+    with open(os.getcwd() + '/' +   "Greedy_NER/cpacketdrop.csv") as f:
+        for line in f:
+            tokens = [t.strip() for t in line.split(';')]
+            try:
+                value = int(tokens[1])
+    
+            except:
+                continue
+            droppackets += value  
+            
+    with open(os.getcwd() + '/' +   "Greedy_NER/cflowmod.csv") as f:
+        for line in f:
+    
+            tokens = [t.strip() for t in line.split(';')]
+            try:
+                value = int(tokens[1])
+    
+            except:
+                continue
+            cflowmod += value  
+    
+    with open(os.getcwd() + '/' +   "Greedy_NER/cflowmodrouting.csv") as f:
+        for line in f:
+    
+            tokens = [t.strip() for t in line.split(';')]
+            try:
+                value = int(tokens[1])
+    
+            except:
+                continue
+            cflowmodrouting += value  
+            
+    with open(os.getcwd() + '/' +   "Greedy_NER/cpacketin.csv") as f:
+        for line in f:
+    
+            tokens = [t.strip() for t in line.split(';')]
+            try:
+                value = int(tokens[1])
+    
+            except:
+                continue
+            cpacketin += value  
+            
+    with open(os.getcwd() + '/' +   "Greedy_NER/cpacketinrouting.csv") as f:
+        for line in f:
+    
+            tokens = [t.strip() for t in line.split(';')]
+            try:
+                value = int(tokens[1])
+    
+            except:
+                continue
+            cpacketinrouting += value 
+            
+    with open(os.getcwd() + '/' +   "Greedy_NER/cpacketout.csv") as f:
+        for line in f:
+    
+            tokens = [t.strip() for t in line.split(';')]
+            try:
+                value = int(tokens[1])
+    
+            except:
+                continue
+            cpacketout += value  
+            
+    with open(os.getcwd() + '/' +   "Greedy_NER/cpacketoutrouting.csv") as f:
+        for line in f:
+    
+            tokens = [t.strip() for t in line.split(';')]
+            try:
+                value = int(tokens[1])
+    
+            except:
+                continue
+            cpacketoutrouting += value  
+    
+    selectedrFp=[]
+    selectedrFpLen = []
+    conterfp=0
+    with open(os.getcwd() + '/' +   "Greedy_NER/InstallStaticfp.csv") as f:
+        for line in f:
+    
+            tokens = [t.strip() for t in line.split(',')]
+            try:
+                
+                conterfp = int(tokens[1])
+                selectedrFp = tokens[2]
+                selectedrFpLen = tokens[3]
+                
+                
+    
+            except:
+                conterfp=0
+                continue
+            
+    with open(os.getcwd() + '/' +   "FinalResults/networkTopo.csv") as f:
+        for line in f:
+    
+            tokens = [t.strip('\n') for t in line.split(',')]
+            try:
+                numrouters = int(tokens[0])
+                numhosts = int(tokens[1])
+                networkidentifier = str(tokens[2]).lstrip('\n')
+                initialentries = int(tokens[3])
+                cycle = int(tokens[4])
+                lamda = float(tokens[5])
+                beta = float(tokens[6])
+
+                           
+    
+            except:
+                continue
+
+      
+
+    
+    with open(os.getcwd() + '/' +   "Greedy_NER/Controlmessagesflowmod.csv") as f:
+        for line in f:
+    
+            tokens = [t.strip() for t in line.split(';')]
+            try:
+                value = int(tokens[1])
+    
+            except:
+                continue
+            countermod += value          
+    
+              
+    counter = 0
+    
+    with open(os.getcwd() + '/' +   "Greedy_NER/Controlmessagespacketin.csv") as f:
+        for line in f:
+    
+            tokens = [t.strip() for t in line.split(';')]
+            try:
+                value = int(tokens[1])
+    
+            except:
+                continue
+            counterin += value
+
+    
+    with open(os.getcwd() + '/' +   "Greedy_NER/Controlmessagesflowremoved.csv") as f:
+        for line in f:
+    
+            tokens = [t.strip() for t in line.split(';')]
+            try:
+                value = int(tokens[1])
+    
+            except:
+                continue
+            counterrem += value
+           
+    try:
+        with open(os.getcwd() + '/' +   "Greedy_NER/selectedrouters.txt") as fin:
+            lines = (line.strip('\n') for line in fin)
+            unique_lines = OrderedDict.fromkeys( (line for line in lines if line) )
+            counterrouters=len(unique_lines)
+        total.append(len(unique_lines))
+    except:
+        total.append('')
+
+    now = datetime.datetime.now()
+    
+    with open(os.getcwd() + '/' +   "FinalResults/TotalControlPackets.csv", "a") as csv_file:
+        writer = csv.writer(csv_file, delimiter=',',quoting=csv.QUOTE_MINIMAL)
+        
+        writer.writerow([Algoruntime,runID,serial,now,Algo,Aggmethod,conterfp,countermod,cflowmodrouting,cflowmod,cpacketin,\
+                         cpacketinrouting,cpacketout, \
+        cpacketoutrouting,counterin,counterrem,droppackets,selectedrFp,memoryusage,selectedrFpLen,Nerrouter,numofners,\
+        sumbeetweenece,giniValue,totalfreeentries,totalusedentries, \
+        d_max,d_min,numhosts,numrouters,numlinks,networkidentifier,initialentries,cycle,\
+        giniThreshold,potentialginiValue,alpha,lamda,beta,numberofremovedFp,numberofnewinstalled,delete_installed_Fp_runtime,\
+                         add_installed_Fp_runtime])
+
+     
+
+    csv_file.close()
+#Add_totalGreedy('Greedy','min')

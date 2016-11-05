@@ -1,0 +1,242 @@
+'''
+Created on May 17, 2014
+
+@author: lucky
+'''
+'''
+Created on Apr 26, 2014
+
+@author: lucky Nacshon
+'''
+import os
+import json
+import string
+import netaddr
+import ipaddr
+from netaddr import *
+from ipaddr import *
+import re
+import copy
+from collections import OrderedDict,defaultdict
+import httplib
+import datetime
+import csv
+import time
+import math
+import ComputeFlowentriesMain
+import os.path
+import timeit
+
+from netaddr import IPNetwork, IPAddress
+
+
+class Routing(object):
+
+    def __init__(self):
+        self.ingress_egressRouters = [] #ingress egress routers to compute the route path
+        self.hosts = {} #for every incoming packet we will know the output port for computing the route
+        self.roters = [] 
+        self.NER_routing = [] #The all routers only in NER's routing path
+        self.NER_fp_routers = []
+        self.NER_routerswithfpandcr = []
+        self.routingMap = []
+        self.counters = 1
+        self.flowmod=0
+        self.allRouters = []
+        self.fp_wasInstalled = []
+        self.prevassigment = []
+        self.time  = 0
+        self.fpwithfpa = []
+        self.meu=0
+        self.alg=''
+        self.allFps = {}
+        self.allFpsPrev = {}
+        self.mulinemax = 0
+        self.fpnames = {}
+        self.router_number_fp_fa_cr = defaultdict(list)
+        self.alpha = 0
+        self.all_routers_cr = {}
+        self.fpnamesnumber = 1
+    
+    def add_fpandItsfpasize(self,fp_fpa): 
+        self.fpwithfpa.append(fp_fpa)
+        
+    def add_fponGreedy(self,list):
+        self.fp_wasInstalled.append(list)
+        
+    def add_allrouters(self,router):
+        self.allRouters.append(router)
+
+    def add_hosts(self, ipv4,to_port,to_router,mac):
+
+        self.hosts[ipv4] = {}
+        self.hosts[ipv4]['mac'] = mac
+        self.hosts[ipv4]['to_router'] = to_router
+        self.hosts[ipv4]['to_port'] = to_port
+        
+    def add_inegrouters(self,to_router, to_port):
+        new_set = [to_router,to_port]
+        self.ingress_egressRouters.append(new_set)
+         
+    def add_routingPath_foringressegress(self,singleRlist):
+        self.roters.append(singleRlist)
+        
+    def add_NERroutingpath(self,rotes): #be able to get output for install flow entry
+        self.NER_routing.append(rotes)
+    def add_NERfprouter(self,slist):
+        self.NER_fp_routers.append(slist)
+        
+        
+        
+routing = Routing()
+
+def get_json(command):
+    try:
+       data  = os.popen(command).read()
+       res = json.loads(data)
+       return res
+    except Exception as err:
+       print "Error in Json "+str(err)
+       return {}
+
+
+def get_number_of_links():
+    print "get_number_of_links"
+    command = 'curl -s http://localhost:8080/wm/topology/links/json'
+    links={}
+    while(True):
+      if(len(links)>0):
+         break
+      links=get_json(command)
+      time.sleep(5)
+    return (len(links))
+
+
+
+def get_userArgs(AggMethod,Algo,list_ofNERs,runID,serial,meu,alpha):
+    routing.meu=meu
+    routing.alpha = alpha
+    getAllrouters(Algo)
+    #ComputeFlowentriesMain.Compute_freeflowentries(runID,0,Algo,AggMethod)
+    computeRourting()
+    compute_iegressroutingPath()
+    checkNERs(list_ofNERs)
+    Compute_freeflowentries_setup()
+
+    if(int(AggMethod)==1):
+        Compute_fps_maximalMaximla()
+ 
+#     elif(int(AggMethod)==2):
+#         Compute_fps_MaximalAggregationOnDST()
+     
+    elif(int(AggMethod)==3):
+        Compute_fps_MinimalMinimal()
+    
+    if(int(Algo)==1):
+        routing.alg='NER'
+        start_add_installed_Fp = timeit.default_timer()
+        installFp_onNERs(list_ofNERs)
+        end_add_installed_Fp = timeit.default_timer()
+        add_installed_Fp_runtime = end_add_installed_Fp - start_add_installed_Fp 
+        
+        
+    elif(int(Algo)==2):
+        routing.alg='Greedy'
+        compute_ca_t()
+        compute_fpa_size()
+        findGreegyrouters_fp()
+        start_add_installed_Fp = timeit.default_timer()
+        installFp_OngreedyAlgorithm(routing.fp_wasInstalled)
+        end_add_installed_Fp = timeit.default_timer()
+        add_installed_Fp_runtime = end_add_installed_Fp - start_add_installed_Fp 
+        
+    return add_installed_Fp_runtime   
+        
+
+        
+
+def setup():
+    routing.fpwithfpa = []    
+    routing.fp_wasInstalled = []
+    
+def compute_potential_flow_assigment(all_routers_cr):
+    routing.prevassigment = copy.copy(routing.fp_wasInstalled)
+    setup()
+    compute_ca_t()
+    compute_freeflowentries_before_potential_assigment(all_routers_cr)
+    compute_fpa_size()
+    findGreegyrouters_fp()
+    list_of_values = compute_freeflowentries_after_potential_assigment()
+    ginipotentialvalue = potential_gini(list_of_values)
+    return ginipotentialvalue
+
+def no_change():
+    routing.fp_wasInstalled = copy.copy(routing.prevassigment)
+    for arr in routing.fpwithfpa:
+        
+        routing.allFpsPrev[arr[0],arr[1]] = arr[2]
+
+def inbalance_rechange():
+    to_remove=[]
+    to_install = []
+    for curr_deployment in routing.fp_wasInstalled:
+        for prev_deployment in routing.prevassigment:
+            if(curr_deployment[1][0] == prev_deployment[1][0] and curr_deployment[1][1] == prev_deployment[1][1]):
+                if(curr_deployment[0]!=prev_deployment[0]):
+                    temp=[]
+                    temp2=[]
+                    
+                    temp.append(curr_deployment[0])
+                    temp2.append(curr_deployment[1][0])
+                    temp2.append(curr_deployment[1][1])
+                    temp.append(temp2)
+                    to_install.append(temp)
+                    fpname = routing.fpnames[curr_deployment[1][0],curr_deployment[1][1]]
+                    to_remove.append(fpname)
+                
+
+                    
+                    
+    for arr in routing.fpwithfpa:
+        routing.allFpsPrev[arr[0],arr[1]] = arr[2]
+    numberofremovedFp = len(to_remove)
+    numberofnewinstalled = len(to_install)
+    
+    start_delete_installed_Fp = timeit.default_timer()
+    delete_installed_Fp_runtime = 0 
+    if(len(to_remove)>0):
+        delete_installed_Fp(to_remove)
+        end_delete_installed_Fp = timeit.default_timer()
+        delete_installed_Fp_runtime = end_delete_installed_Fp - start_delete_installed_Fp
+    
+    start_add_installed_Fp = timeit.default_timer()
+    add_installed_Fp_runtime =0
+    if(len(to_install)>0):
+        installFp_OngreedyAlgorithm(to_install)
+        end_add_installed_Fp = timeit.default_timer()
+        add_installed_Fp_runtime = end_add_installed_Fp - start_add_installed_Fp   
+    
+    return numberofremovedFp,numberofnewinstalled,delete_installed_Fp_runtime,add_installed_Fp_runtime
+    
+def compute_freeflowentries_before_potential_assigment(all_routers_cr):
+    
+        for i in range(0,len(routing.NER_routerswithfpandcr)):
+            routers_arr = routing.NER_routerswithfpandcr[i]
+    
+        #for routers_arr in routing.NER_routerswithfpandcr:
+            
+            for router_arr in range(0,len(routers_arr[-1])):
+                
+
+                for prev_routers in routing.prevassigment:
+                    if(prev_routers[0] == routers_arr[router_arr][0]):
+                        
+                        if((prev_routers[1][0]==routers_arr[-1][router_arr][0]) and (prev_routers[1][1]==routers_arr[-1][router_arr][1])):
+
+                                all_routers_cr[prev_routers[0]] = all_routers_cr[prev_routers[0]] - (1 + routing.allFps[prev_routers[1][0],prev_routers[1][1]])
+                                
+                                
+                                routing.NER_routerswithfpandcr[i][router_arr][1] = all_routers_cr[prev_routers[0]]
+                               
+            
+        routing.all_routers_cr = copy.copy(all_routers_cr)

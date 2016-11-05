@@ -1,0 +1,44 @@
+#!/bin/bash
+
+
+for ((n=0;n<1;n++))
+do
+
+
+
+
+
+ gnome-terminal --tab --title="floodlightctl" --command="java -jar /home/lucky/floodlight/target/floodlight.jar" --disable-factory &
+ pidcontroller=$!
+
+ sleep 5;
+
+
+ 
+ 
+
+ 
+ gnome-terminal --tab --command="sudo /usr/bin/python2.7 /home/lucky/PWorkspace/NFO/TreeTopo.py $n" --disable-factory &
+ pidtopo=$!
+ gnome-terminal --tab --command="python /home/lucky/PWorkspace/NFO/mainNFO.py $n" --disable-factory &
+ pidmain=$!
+
+
+
+
+
+ 
+ 
+ sleep 10;
+ gnome-terminal --tab --command="sudo /home/lucky/mininet/bin/mn --clean" --disable-factory &
+ pidclean=$!
+ sleep 20;
+ kill -SIGHUP $pidcontroller
+ kill -SIGHUP $pidtopo
+ kill -SIGHUP $pidmain
+ kill -SIGHUP $pidclean
+ 
+ 
+
+ 
+done

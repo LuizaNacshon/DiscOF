@@ -1,0 +1,108 @@
+
+from mininet.net import Mininet
+from mininet.topolib import TreeTopo
+
+
+from mininet.node import Node
+import NewTopo
+from mininet.log import setLogLevel
+import sys
+
+
+
+
+from select import poll, POLLIN
+from mininet.topo import *
+from mininet.node import Controller, OVSSwitch,RemoteController
+from mininet.cli import CLI
+from time import time,sleep
+#import time
+import os,csv
+import random
+import RocketFuelMININERtopo,RocketfuelBigtopo,RocketFuel15topo
+import MininetTree
+
+
+random.seed(448)
+def chunks( l, n ):
+    "Divide list l into chunks of size n"
+    return [ l[ i: i + n ] for i in range( 0, len( l ), n ) ]
+def startpings( host, targetips ):
+    "Tell host to repeatedly ping targets"
+#     numofflow=len(targetips)
+#     with open("/home/lucky/FinalResults/flowsnumber.csv", "a") as csv_file:
+#                  writer = csv.writer(csv_file, delimiter =";",quoting=csv.QUOTE_MINIMAL)
+#                  writer.writerow([numofflow])
+#     csv_file.close()
+    targetips = ' '.join( targetips )
+
+    # Simple ping loop
+#     cmd = ( 'while true; do '
+#             ' for ip in %s; do ' % targetips +
+#             '  echo -n %s "->" $ip ' % host.IP() +
+#             '   `ping -c1 -w 1 $ip | grep packets` ;'
+#             '  sleep 0;'
+#             ' done; '
+#             'done ' '1> /home/lucky/FinalResults/pingslog/ping.txt 2>/home/lucky/FinalResults/pingslog/pingerr.txt &')
+
+    cmd = ( 'while true; do '
+            ' for ip in %s; do ' % targetips +
+            '  echo -n %s "->" $ip ' % host.IP() +
+            '   `ping -c1 -w 1 $ip | grep packets` ;'
+            '  sleep 1;'
+            ' done; '
+            'done &')
+
+    print ( '*** Host %s (%s) will be pinging ips: %s' %
+            ( host.name, host.IP(), targetips ) )
+
+   
+    host.cmd( cmd )
+
+
+
+def multiping( netsize,seconds1 ,seconds2):
+    "Select topology type:"
+    #initialFlowEntries = 800#2100
+    numberofpinginghosts =10
+    # Create network and identify subnets
+    #t = NewTopo.SampleTopo()
+    #tree4 = TreeTopo(depth=2,fanout=10)
+    #t=RocketFuel15topo.SampleTopo()
+    #t=RocketfuelBigtopo.SampleTopo()
+    t=MininetTree.CustomTopo()
+    net = Mininet(topo=t, controller=lambda a: RemoteController(a, defaultIP='127.0.0.1', port=6633))
+    #net = Mininet(topo=tree4)
+    net.start()
+    
+    
+    switches = net.switches
+    hosts = net.hosts
+    numofswitches=len(switches)
+    numofhosts = len(hosts)
+    networkidentifier = 'Treetopo11router10hostsperrouter'
+    #networkidentifier = 'MininetTree11routers'
+    net.pingAll()
+    net.pingAll()
+    sleep(600)
+
+    
+
+    
+if __name__ == '__main__':
+    global initialFlowEntries 
+#     column = sys.argv[1]
+#     with open('/home/lucky/demoNFO/inputsFile.csv') as file:
+#         second_line = list(file)[1]
+#         arr=second_line.split(',')
+#         print arr[int(sys.argv[1])]
+        #initialFlowEntries = arr[int(sys.argv[1])]
+    initialFlowEntries=2000
+    setLogLevel( 'info' )
+    multiping( netsize=2, seconds1=5000 ,seconds2=1)
+    #seconds1=1000
+    #300
+    #multiping( netsize=2, chunksize1=5030, chunksize2=50,chunksize3=100,seconds1=120 ,second2=1800,second3=1800)
+
+   # print h1.cmd('ping -c1 %s' % h2.IP(),'1> /tmp/h1.out 2>/tmp/h1.err &' )
+#net.stop()
